@@ -5,6 +5,7 @@
   --text: #0f172a;
   --muted: #475569;
   --border: #cbd5e1;
+  --control-border: #64748b;
   --primary: #166534;
   --on-primary: #fff;
   --primary-soft: #f0fdf4;
@@ -46,6 +47,7 @@
   --text: #f1f5f9;
   --muted: #cbd5e1;
   --border: #526171;
+  --control-border: #94a3b8;
   --primary: #86efac;
   --on-primary: #102018;
   --primary-soft: #123225;
@@ -91,7 +93,7 @@ button {
   gap: var(--space-2);
   color: var(--text);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius-control);
   min-block-size: 44px;
   padding: var(--space-2) var(--space-4);
@@ -258,7 +260,7 @@ small,
 .button.secondary {
   background: var(--surface);
   color: var(--text);
-  border-color: var(--border);
+  border-color: var(--control-border);
 }
 .text-button {
   border: 0;
@@ -382,7 +384,7 @@ select,
 textarea {
   inline-size: 100%;
   min-block-size: 44px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);

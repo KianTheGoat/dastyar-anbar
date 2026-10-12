@@ -39,6 +39,7 @@ oversized marketing headings, scroll reveals, confetti, or decorative charts.
 | text | #0F172A | #F1F5F9 |
 | muted text | #475569 | #CBD5E1 |
 | border | #CBD5E1 | #526171 |
+| control border | #64748B | #94A3B8 |
 | primary/action | #166534 | #86EFAC |
 | on primary | #FFFFFF | #102018 |
 | low text / background | #991B1B / #FEF2F2 | #FCA5A5 / #381A20 |

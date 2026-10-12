@@ -25,7 +25,6 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://anbar_test:ci-only-disposable-password@127.0.0.1:5432/anbar_test
       TEST_DATABASE_URL: postgresql+psycopg://anbar_test:ci-only-disposable-password@127.0.0.1:5432/anbar_test
-      PG_TOOL_CONTAINER: ${{ job.services.postgres.id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -37,6 +36,8 @@ jobs:
       - run: python -m alembic upgrade head
       - run: python -m alembic check
       - run: python -m pytest
+        env:
+          PG_TOOL_CONTAINER: ${{ job.services.postgres.id }}
       - run: python -m pip_audit -r requirements-dev.lock --no-deps --disable-pip
   web:
     runs-on: ubuntu-latest
