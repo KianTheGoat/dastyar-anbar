@@ -7,7 +7,8 @@ export default defineConfig(({ mode }) => ({
     host: "127.0.0.1",
     proxy: {
       "/api":
-        loadEnv(mode, ".", "VITE_").VITE_API_TARGET || "http://127.0.0.1:8000",
+        loadEnv(mode, ".", "VITE_").VITE_API_TARGET ||
+        `http://127.0.0.1:${loadEnv(mode, "../..", "API_PORT").API_PORT || "8000"}`,
     },
   },
 }));

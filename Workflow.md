@@ -24,9 +24,16 @@ No SMTP or Google credentials are supplied by the repository. Data is in the
 postgres_data volume. Stop with `down` **without `-v`** to preserve it.
 
 For active frontend development: `cd apps/web`, `npm ci`, `npm run dev -- --host
-127.0.0.1`; the default proxy is the local API at port 8000. If a different API port
-is used, set VITE_API_TARGET in ignored apps/web/.env.local. Production never uses
+127.0.0.1`; the proxy reads API_PORT from the root .env, falling back to port 8000.
+An explicit VITE_API_TARGET in ignored apps/web/.env.local overrides this. Restart
+Vite after changing environment files. The complete Docker stack must be running.
+Production never uses
 the Vite development server.
+
+If the frontend opens but reports a connection error, check compose ps and
+/api/ready first. Restart with the documented compose up command, preserving
+volumes and existing secrets. A network failure is not evidence of missing database
+configuration. Persistent local services restart unless explicitly stopped.
 
 Native API: create a virtual environment, install requirements-dev.lock, then
 `pip install -e . --no-deps`. Set DATABASE_URL (postgresql+psycopg), APP_SECRET,
@@ -64,6 +71,8 @@ one-use reset and other-session revocation. Verify encrypted previews discard
 unselected columns and atomic Sheets failures roll back inventory as well as sales.
 Restore a real encrypted test backup; reapply deleted-workspace markers, reject
 tampering, revoke sessions and expire only application-owned old backup files.
+For analytics, verify Tehran midnight boundaries, net returns, excluded cancelled
+orders, filter agreement, two-shop isolation, and unknown versus aggregate sales.
 
 Browser acceptance: synthetic data only; actual upload -> mapping -> preview ->
 apply -> ranked dashboard -> prepared assistant answer. Check RTL, labels, keyboard,

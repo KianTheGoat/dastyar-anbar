@@ -82,6 +82,10 @@ export function App() {
     }
   }
   const owner = session?.account;
+  useEffect(() => {
+    document.documentElement.dataset.page =
+      !legal && (!owner || authLink) ? "auth" : "workspace";
+  }, [owner, authLink, legal]);
   const links = [
     ["/", "نمای انبار", Package],
     ["/sources", "ورود اطلاعات", UploadSimple],
@@ -150,7 +154,16 @@ export function App() {
             kind={path.slice(1) as "privacy" | "terms" | "cookies" | "guide"}
             meta={meta}
           />
-        ) : !meta?.configured ? (
+        ) : !meta || (!session && error) ? (
+          <section className="panel setup-state">
+            <h1>ارتباط با سرویس برقرار نشد</h1>
+            <p>پس از برقراری اتصال، دوباره تلاش کنید.</p>
+            <button onClick={boot}>
+              <ArrowClockwise size={20} aria-hidden="true" />
+              تلاش دوباره
+            </button>
+          </section>
+        ) : !meta.configured ? (
           <section className="panel setup-state">
             <h1>سرویس در انتظار راه‌اندازی است</h1>
             <p>

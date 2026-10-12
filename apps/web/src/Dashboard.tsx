@@ -22,6 +22,7 @@ import {
   type Variant,
 } from "./api";
 import { Empty, ErrorNotice, productionText, stateText } from "./ui";
+import { Charts } from "./Charts";
 
 export function Dashboard() {
   const [data, setData] = useState<Report | null>(null);
@@ -147,6 +148,7 @@ export function Dashboard() {
           <small>با فروش ثبت‌شده</small>
         </div>
       </section>
+      <Charts query={query} refresh={refresh} />
       <section className="panel inventory">
         <div className="section-heading">
           <h2>کالاهای انبار</h2>
@@ -389,6 +391,7 @@ export function Dashboard() {
 
 function Assistant({ start, end }: { start?: string; end?: string }) {
   const [open, setOpen] = useState(false);
+  const [keyboard, setKeyboard] = useState(false);
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState<{
     message: string;
@@ -396,6 +399,10 @@ function Assistant({ start, end }: { start?: string; end?: string }) {
   } | null>(null);
   const [error, setError] = useState<unknown>(null);
   const ref = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (open) closeRef.current?.focus();
+  }, [open]);
   async function ask(topic: string) {
     setBusy(true);
     setError(null);
@@ -418,80 +425,88 @@ function Assistant({ start, end }: { start?: string; end?: string }) {
   return (
     <aside
       className="assistant"
+      data-open={open}
+      data-keyboard={keyboard}
+      onPointerDown={() => setKeyboard(false)}
       onKeyDown={(e) => {
+        setKeyboard(true);
         if (e.key === "Escape") close();
       }}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
       }}
     >
-      {open && (
-        <section id="assistant-panel" aria-label="پرسش‌های دستیار">
-          <div className="section-heading">
-            <h2>دستیار انبار</h2>
+      <section
+        id="assistant-panel"
+        aria-label="پرسش‌های دستیار"
+        aria-hidden={!open}
+        inert={!open}
+      >
+        <div className="section-heading">
+          <h2>دستیار انبار</h2>
+          <button
+            ref={closeRef}
+            className="icon-button"
+            onClick={close}
+            aria-label="بستن دستیار"
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+        <p className="muted">
+          پیشنهادها از اطلاعات همین فروشگاه محاسبه می‌شوند.
+        </p>
+        <div className="questions">
+          {[
+            ["priorities", "چه کالاهایی تأمین شوند؟"],
+            ["excess", "موجودی زیاد کدام‌هاست؟"],
+            ["review", "چه مواردی بررسی شوند؟"],
+            ["explain", "چرا این ترتیب؟"],
+          ].map(([key, label]) => (
             <button
-              className="icon-button"
-              onClick={close}
-              aria-label="بستن دستیار"
+              key={key}
+              aria-disabled={busy}
+              aria-busy={busy}
+              onClick={() => {
+                if (!busy) void ask(key);
+              }}
             >
-              <X size={20} aria-hidden="true" />
+              {label}
             </button>
-          </div>
-          <p className="muted">
-            پیشنهادها از اطلاعات همین فروشگاه محاسبه می‌شوند.
-          </p>
-          <div className="questions">
-            {[
-              ["priorities", "چه کالاهایی تأمین شوند؟"],
-              ["excess", "موجودی زیاد کدام‌هاست؟"],
-              ["review", "چه مواردی بررسی شوند؟"],
-              ["explain", "چرا این ترتیب؟"],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                aria-disabled={busy}
-                aria-busy={busy}
-                onClick={() => {
-                  if (!busy) void ask(key);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <ErrorNotice error={error} />
-          <div role="status" aria-live="polite">
-            {busy
-              ? "در حال بررسی…"
-              : answer && (
-                  <>
-                    <p>{answer.message}</p>
-                    {answer.items.map((item) => (
-                      <div className="assistant-item" key={item.id}>
-                        <strong>{item.name}</strong>
-                        <span>
-                          {item.color}، سایز <bdi>{item.size}</bdi>
-                        </span>
-                        <small>
-                          {number(item.net_units)} فروش،{" "}
-                          {number(item.available)} موجودی
-                        </small>
-                      </div>
-                    ))}
-                  </>
-                )}
-          </div>
-        </section>
-      )}
+          ))}
+        </div>
+        <ErrorNotice error={error} />
+        <div role="status" aria-live="polite">
+          {busy
+            ? "در حال بررسی…"
+            : answer && (
+                <>
+                  <p>{answer.message}</p>
+                  {answer.items.map((item) => (
+                    <div className="assistant-item" key={item.id}>
+                      <strong>{item.name}</strong>
+                      <span>
+                        {item.color}، سایز <bdi>{item.size}</bdi>
+                      </span>
+                      <small>
+                        {number(item.net_units)} فروش، {number(item.available)}{" "}
+                        موجودی
+                      </small>
+                    </div>
+                  ))}
+                </>
+              )}
+        </div>
+      </section>
       <button
         ref={ref}
         className="assistant-trigger"
         aria-expanded={open}
         aria-controls="assistant-panel"
+        aria-label="دستیار انبار"
         onClick={() => setOpen((v) => !v)}
       >
         <ChatCircleDots aria-hidden="true" size={22} />
-        دستیار انبار
       </button>
     </aside>
   );

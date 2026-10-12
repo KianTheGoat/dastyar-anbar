@@ -1,10 +1,5 @@
 import { useState, type FormEvent } from "react";
-import {
-  ArrowLeft,
-  CheckCircle,
-  ShieldCheck,
-  Stack,
-} from "@phosphor-icons/react";
+import { ArrowLeft, Stack } from "@phosphor-icons/react";
 import { api, ApiError, json, type Meta, type Session } from "./api";
 import { ErrorNotice, Success } from "./ui";
 
@@ -29,7 +24,7 @@ export function Auth({
   const [success, setSuccess] = useState("");
   const [fields, setFields] = useState<string[]>([]);
   const title = {
-    login: "به انبارتان خوش آمدید",
+    login: "ورود به دستیار انبار",
     register: "فروشگاهتان را اضافه کنید",
     forgot: "بازیابی رمز ورود",
     reset: "رمز تازه انتخاب کنید",
@@ -114,38 +109,12 @@ export function Auth({
   }
   return (
     <div className="auth-layout">
-      <section className="auth-story">
-        <span className="brand-mark">
-          <Stack size={28} aria-hidden="true" />
-        </span>
-        <p className="eyeline">دستیار انبار، از مجموعهٔ دستیار</p>
-        <h1>
-          هر رنگ و سایز،
-          <br />
-          در جای درست.
-        </h1>
-        <p>
-          موجودی را ببینید، پرفروش‌ها را بشناسید و تأمین دوباره را با اطلاعات
-          روشن شروع کنید.
-        </p>
-        <ul className="benefits">
-          <li>
-            <CheckCircle size={22} aria-hidden="true" />
-            حد موجودی برای هر دسته‌بندی
-          </li>
-          <li>
-            <CheckCircle size={22} aria-hidden="true" />
-            ورود Excel، CSV و گوگل‌شیت خصوصی
-          </li>
-          <li>
-            <ShieldCheck size={22} aria-hidden="true" />
-            اطلاعات هر فروشگاه جدا و محفوظ
-          </li>
-        </ul>
-      </section>
       <section className="auth-form panel">
-        <h2>{title}</h2>
-        <p>با حساب فروشگاهتان ادامه دهید.</p>
+        <span className="auth-symbol">
+          <Stack size={26} aria-hidden="true" />
+        </span>
+        <h1>{title}</h1>
+
         <ErrorNotice error={error} />
         {success && <Success>{success}</Success>}
         <form onSubmit={submit}>
@@ -185,14 +154,9 @@ export function Auth({
                 autoComplete="email"
                 aria-invalid={fields.includes("email")}
                 aria-describedby={
-                  fields.includes("email")
-                    ? "email-help email-error"
-                    : "email-help"
+                  fields.includes("email") ? "email-error" : undefined
                 }
               />
-              <small id="email-help">
-                برای ورود و بازیابی حساب استفاده می‌شود.
-              </small>
               {fields.includes("email") && (
                 <small id="email-error">ایمیل معتبر وارد کنید.</small>
               )}
@@ -216,16 +180,19 @@ export function Auth({
                 }
                 aria-invalid={fields.includes("password")}
                 aria-describedby={
-                  fields.includes("password")
-                    ? "password-help password-error"
-                    : "password-help"
+                  [
+                    mode !== "login" ? "password-help" : "",
+                    fields.includes("password") ? "password-error" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ") || undefined
                 }
               />
-              <small id="password-help">
-                {mode === "login"
-                  ? "می‌توانید از مدیر رمز مرورگر استفاده کنید."
-                  : "حداقل ۱۲ نویسه؛ یک عبارت طولانی انتخاب کنید."}
-              </small>
+              {mode !== "login" && (
+                <small id="password-help">
+                  حداقل ۱۲ نویسه؛ یک عبارت طولانی انتخاب کنید.
+                </small>
+              )}
               {fields.includes("password") && (
                 <small id="password-error">
                   طول و اعتبار رمز را بررسی کنید.
@@ -277,7 +244,7 @@ export function Auth({
                 className="text-button"
                 onClick={() => changeMode("register")}
               >
-                فروشگاه تازه دارید؟ ساخت حساب
+                ساخت حساب فروشگاه
               </button>
               {meta.password_recovery_available && (
                 <button
@@ -294,11 +261,6 @@ export function Auth({
             </button>
           )}
         </div>
-        <p className="secure-note">
-          <ShieldCheck size={18} aria-hidden="true" />
-          تنها کوکی ضروری ورود استفاده می‌شود.{" "}
-          <a href="/cookies">جزئیات کوکی‌ها</a>
-        </p>
       </section>
     </div>
   );

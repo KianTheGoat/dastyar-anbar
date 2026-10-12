@@ -50,6 +50,7 @@ apps/web/
   src/App.tsx               authenticated shell and public legal routes
   src/Auth.tsx              login/register/verify/reset forms
   src/Dashboard.tsx         table, filters, counts, replenishment, assistant
+  src/Charts.tsx            daily sales, stock donut, top sellers; accessible values
   src/Sources.tsx           file mapping, preview/apply, manual private Sheets
   src/Settings.tsx          category thresholds and account lifecycle
   src/Legal.tsx             privacy, terms, cookies and preparation guide
@@ -152,6 +153,7 @@ imported data stays until account deletion. Google sharing revocation is separat
 | POST | /api/v1/auth/verify | one-use token, fresh password and policy acceptance |
 | POST | /api/v1/auth/password/{request,reset,change} | generic recovery request, token reset, reauthenticated change |
 | GET | /api/v1/dashboard, /variants | summary or rows; start/end/category, search/state/priority/page filters |
+| GET | /api/v1/analytics | tenant-scoped filtered counts, net units, Tehran daily sales and top five SKUs; unknown sales stay null, aggregate mode has no daily trend |
 | GET/PATCH | /api/v1/categories, /categories/{id} | list or threshold update |
 | PATCH | /api/v1/variants/{id}/replenishment | none/planned/producing |
 | POST | /api/v1/imports/headers, /preview | multipart file mapping or validation/preview |

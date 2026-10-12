@@ -182,7 +182,17 @@ def variants(
     db: Session = Depends(get_db),
 ):
     data = report(db, owner.workspace_id, start, end, category_id)
-    rows = data.pop("rows")
+    rows = filtered_rows(data.pop("rows"), state, search, priority_only)
+    return data | {
+        "rows": rows[(page - 1) * limit : page * limit],
+        "total": len(rows),
+        "page": page,
+        "counts": {key: sum(r["state"] == key for r in rows) for key in ["low", "normal", "high"]},
+        "priorities": sum(r["priority"] is not None for r in rows),
+    }
+
+
+def filtered_rows(rows: list[dict], state, search: str, priority_only: bool) -> list[dict]:
     if state:
         rows = [r for r in rows if r["state"] == state]
     if search:
@@ -194,10 +204,74 @@ def variants(
         ]
     if priority_only:
         rows = [r for r in rows if r["priority"] is not None]
-    return data | {
-        "rows": rows[(page - 1) * limit : page * limit],
-        "total": len(rows),
-        "page": page,
+    return rows
+
+
+@router.get("/analytics")
+def analytics(
+    start: date | None = None,
+    end: date | None = None,
+    category_id: UUID | None = None,
+    state: Literal["low", "normal", "high"] | None = None,
+    search: str = Query("", max_length=100),
+    priority_only: bool = False,
+    owner: Account = Depends(account),
+    db: Session = Depends(get_db),
+):
+    data = report(db, owner.workspace_id, start, end, category_id)
+    rows = filtered_rows(data["rows"], state, search, priority_only)
+    counts = {key: sum(r["state"] == key for r in rows) for key in ["low", "normal", "high"]}
+    has_sales = (
+        data["sales_mode"] == "aggregate"
+        or db.scalar(
+            select(SaleLine.id).where(SaleLine.workspace_id == owner.workspace_id).limit(1)
+        )
+        is not None
+    )
+    daily = []
+    if has_sales and data["sales_mode"] == "detail":
+        first, last = (
+            date.fromisoformat(data["period_start"]),
+            date.fromisoformat(data["period_end"]),
+        )
+        zone = ZoneInfo("Asia/Tehran")
+        day = func.date(func.timezone("Asia/Tehran", SaleLine.sold_at))
+        totals = dict(
+            db.execute(
+                select(day, func.sum(SaleLine.quantity - SaleLine.returned_quantity))
+                .where(
+                    SaleLine.workspace_id == owner.workspace_id,
+                    SaleLine.variant_id.in_([UUID(r["id"]) for r in rows]),
+                    SaleLine.status.in_(["preparing", "shipping", "completed"]),
+                    SaleLine.sold_at >= datetime.combine(first, datetime.min.time(), zone),
+                    SaleLine.sold_at
+                    < datetime.combine(last + timedelta(days=1), datetime.min.time(), zone),
+                )
+                .group_by(day)
+            ).all()
+        )
+        daily = [
+            {
+                "date": (first + timedelta(days=i)).isoformat(),
+                "units": int(totals.get(first + timedelta(days=i), 0)),
+            }
+            for i in range((last - first).days + 1)
+        ]
+    top = sorted(
+        [r for r in rows if r["net_units"] > 0], key=lambda r: (-r["net_units"], r["sku"])
+    )[:5]
+    return {
+        "counts": counts,
+        "total_variants": len(rows),
+        "net_units": sum(r["net_units"] for r in rows) if has_sales else None,
+        "has_sales": has_sales,
+        "sales_mode": data["sales_mode"],
+        "period_start": data["period_start"],
+        "period_end": data["period_end"],
+        "daily": daily,
+        "top_sellers": [
+            {k: r[k] for k in ["sku", "name", "color", "size", "net_units"]} for r in top
+        ],
     }
 
 

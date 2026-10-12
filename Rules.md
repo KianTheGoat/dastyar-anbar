@@ -34,24 +34,30 @@ oversized marketing headings, scroll reveals, confetti, or decorative charts.
 
 | Token | Light | Dark |
 | --- | --- | --- |
-| canvas | #F8FAFC | #101820 |
-| surface | #FFFFFF | #17232D |
-| text | #0F172A | #F1F5F9 |
-| muted text | #475569 | #CBD5E1 |
-| border | #CBD5E1 | #526171 |
-| control border | #64748B | #94A3B8 |
-| primary/action | #166534 | #86EFAC |
-| on primary | #FFFFFF | #102018 |
-| low text / background | #991B1B / #FEF2F2 | #FCA5A5 / #381A20 |
-| normal text / background | #166534 / #F0FDF4 | #86EFAC / #123225 |
-| excess text / background | #1E40AF / #EFF6FF | #BFDBFE / #192E46 |
+| canvas | #FAF8F5 | #181411 |
+| surface | #FFFCF8 | #231D18 |
+| text | #30251F | #F7EEE4 |
+| muted text | #736157 | #C5B4A6 |
+| border | #E6DDD4 | #493B31 |
+| control border | #9A8171 | #947F6E |
+| primary/action | #9A431C | #EFB98F |
+| on primary | #FFFFFF | #301F15 |
+| low text / background | #9D3626 / #FFF0EB | #F0A58E / #40261F |
+| normal text / background | #496143 / #EDF3E8 | #BBCCAA / #26301F |
+| excess text / background | #86610C / #FAF0D9 | #E8C177 / #3C3019 |
 
-Action accent is green; semantic inventory colors are distinct functional roles.
+Action accent is warm terracotta; semantic inventory colors have distinct roles.
+The human requested warm colors and Apple-inspired whitespace on 2026-10-12.
+Center a single login card without a promotional side column or field-helper clutter.
+Start in light mode unless the user selected dark mode for this tab.
+Light-mode summary cards have a visible warm border and a restrained two-layer
+shadow (2px/4px at 3.5%, 8px/24px at 6.5%) for separation from the canvas.
+Keep dark-mode summary surfaces unchanged when refining light-only elevation.
 Never convey a state by color alone: use text such as «کمبود» or «موجودی زیاد».
 All token pairs must meet 4.5:1 for ordinary text and 3:1 for meaningful controls.
 
-Spacing scale: 4/8/12/16/24/32/48px expressed as rem. Radius: 8px controls,
-12px surfaces. Content max-width 1280px, gutters 16px mobile and 32px desktop.
+Spacing scale: 4/8/12/16/24/32/48px expressed as rem. Radius: 12px controls,
+20px surfaces. Content max-width 1280px, gutters 16px mobile and 32px desktop.
 Body 16px / line-height 1.7, metadata >=14px, headings 24-32px. Persian joined
 letters use letter-spacing:0; do not apply negative Latin tracking to Persian.
 Use system fonts initially; production may self-host licensed Vazirmatn with its
@@ -75,6 +81,13 @@ CSS transitions only for feedback: press 100ms, occasional panel enter 180ms,
 exit 120ms; easing cubic-bezier(0.23,1,0.32,1). Enumerate properties; never
 transition:all. Only transform/opacity for movement. No scale(0) entrances.
 Springs/gestures are not required; add only if a real interaction earns them.
+The chat trigger is a 56px circle with a chat icon and accessible name, no visible
+caption. Its panel opens above the trigger with 200ms opacity/transform feedback;
+keyboard interaction is immediate. Initial login entry is 240ms and chart bar entry
+260ms; reduced motion disables both. No delayed input or artificial loading timers.
+Use source-backed daily line/area, inventory donut and top-seller bars. All charts
+share table filters and have readable numbers and accessible data alternatives.
+No imported sales means unknown; aggregate sales never invent a daily trend.
 Honor reduced motion, reduced transparency and more contrast; solid surfaces
 remain readable without blur. Hover effects only on devices supporting hover.
 

@@ -273,6 +273,67 @@ def test_snapshot_dates_thresholds_aggregate_mode_and_production(clients):
     assert a.get("/api/v1/variants").json()["rows"][0]["state"] == "normal"
 
 
+def test_analytics_unknown_sales_and_aggregate_without_invented_trend(clients):
+    a, _, _, _, _ = clients
+    h = register(a)
+    import_inventory(a, h)
+    unknown = a.get("/api/v1/analytics").json()
+    assert unknown["counts"] == {"low": 1, "normal": 0, "high": 0}
+    assert unknown["net_units"] is None and not unknown["has_sales"]
+    assert unknown["daily"] == [] and unknown["top_sellers"] == []
+    day = utcnow().date().isoformat()
+    batch = preview(
+        a, h, "aggregate", f"sku,net_units,period_start,period_end\n001,20,{day},{day}\n"
+    )
+    assert a.post(f"/api/v1/imports/{batch.json()['id']}/apply", headers=h).status_code == 200
+    aggregate = a.get("/api/v1/analytics").json()
+    assert aggregate["has_sales"] and aggregate["net_units"] == 20
+    assert aggregate["daily"] == [] and aggregate["top_sellers"][0]["sku"] == "001"
+
+
+def test_analytics_tehran_dates_filters_returns_and_tenant_isolation(clients):
+    a, b, _, _, _ = clients
+    ha, hb = register(a), register(b, "b")
+    import_inventory(a, ha)
+    import_inventory(a, ha, "002", quantity=8)
+    import_inventory(b, hb, "foreign")
+    batch = preview(
+        a,
+        ha,
+        "sales",
+        "source,order_id,line_id,sku,sold_at,quantity,status,returned_quantity\n"
+        "site,1,1,001,2026-10-10T21:00:00Z,8,shipping,2\n"
+        "site,2,1,001,2026-10-11T20:30:00Z,3,preparing,0\n"
+        "site,3,1,002,2026-10-11T10:00:00Z,4,completed,0\n"
+        "site,4,1,001,2026-10-11T10:00:00Z,100,cancelled,0\n",
+    )
+    assert batch.status_code == 200, batch.text
+    assert a.post(f"/api/v1/imports/{batch.json()['id']}/apply", headers=ha).status_code == 200
+    query = "start=2026-10-11&end=2026-10-12"
+    response = a.get(f"/api/v1/analytics?{query}")
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["daily"] == [
+        {"date": "2026-10-11", "units": 10},
+        {"date": "2026-10-12", "units": 3},
+    ]
+    assert data["net_units"] == 13 and data["total_variants"] == 2
+    assert [r["sku"] for r in data["top_sellers"]] == ["001", "002"]
+    low = a.get(f"/api/v1/analytics?{query}&state=low").json()
+    assert low["net_units"] == 9 and low["counts"]["high"] == 0
+    assert sum(day["units"] for day in low["daily"]) == 9
+    page = a.get(f"/api/v1/variants?{query}&limit=1&state=low").json()
+    assert page["counts"] == low["counts"]
+    empty = a.get(f"/api/v1/analytics?{query}&search=missing").json()
+    assert empty["total_variants"] == 0 and empty["net_units"] == 0
+    assert all(day["units"] == 0 for day in empty["daily"])
+    foreign = b.get(f"/api/v1/analytics?{query}").json()
+    assert foreign["net_units"] is None and foreign["top_sellers"] == []
+    category = a.get("/api/v1/categories").json()[0]["id"]
+    assert b.get(f"/api/v1/analytics?category_id={category}").status_code == 404
+    assert a.get("/api/v1/analytics?start=2026-10-12&end=2026-10-11").status_code == 400
+
+
 def test_password_reset_is_one_use_and_invalidates_sessions(clients):
     a, b, _, _, sent = clients
     h = register(a)

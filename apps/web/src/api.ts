@@ -55,6 +55,17 @@ export type Report = {
   data_updated_at: string | null;
   generated_at: string;
 };
+export type Analytics = {
+  counts: Record<"low" | "normal" | "high", number>;
+  total_variants: number;
+  net_units: number | null;
+  has_sales: boolean;
+  sales_mode: string;
+  period_start: string;
+  period_end: string;
+  daily: { date: string; units: number }[];
+  top_sellers: Pick<Variant, "sku" | "name" | "color" | "size" | "net_units">[];
+};
 export const messages: Record<string, string> = {
   authentication_required: "نشست شما پایان یافته است. دوباره وارد شوید.",
   invalid_credentials: "ایمیل یا رمز درست نیست، یا ایمیل هنوز تأیید نشده است.",
@@ -102,6 +113,9 @@ export const messages: Record<string, string> = {
   service_not_configured: "سرویس هنوز تنظیم نشده است.",
   data_conflict:
     "اطلاعات هم‌زمان تغییر کرده‌اند. تازه کنید و دوباره تلاش کنید.",
+  network_unavailable:
+    "ارتباط با سرویس برقرار نشد. اتصال را بررسی کنید و دوباره تلاش کنید.",
+  invalid_response: "سرویس موقتاً پاسخ معتبر نداد. دوباره تلاش کنید.",
 };
 let csrf = "";
 export function setSession(value: Session) {
@@ -124,12 +138,25 @@ export async function api<T>(
     headers.set("Content-Type", "application/json");
   if (options.method && options.method !== "GET")
     headers.set("X-CSRF-Token", csrf);
-  const response = await fetch("/api" + path, {
-    ...options,
-    headers,
-    credentials: "same-origin",
-  });
-  const data = await response.json();
+  let response: Response;
+  try {
+    response = await fetch("/api" + path, {
+      ...options,
+      headers,
+      credentials: "same-origin",
+    });
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
+    throw new ApiError("network_unavailable");
+  }
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new ApiError(
+      response.status >= 500 ? "network_unavailable" : "invalid_response",
+    );
+  }
   if (!response.ok) {
     if (data.detail === "authentication_required")
       window.dispatchEvent(new Event("session-expired"));
