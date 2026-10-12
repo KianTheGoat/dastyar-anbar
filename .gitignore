@@ -1,6 +1,9 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
+backups/
+*.anbar
 .venv/
 venv/
 node_modules/
@@ -19,3 +22,6 @@ coverage/
 .DS_Store
 Thumbs.db
 artifacts/
+credentials/
+*-key.json
+*service-account*.json

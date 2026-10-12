@@ -1,0 +1,97 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: anbar_owner
+      POSTGRES_DB: anbar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Required migration-owner password}
+      RUNTIME_DB_PASSWORD: ${RUNTIME_DB_PASSWORD:?Required separate runtime password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-runtime.sh:/docker-entrypoint-initdb.d/init-runtime.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anbar_owner -d anbar"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+  migrate:
+    build: ../apps/api
+    environment:
+      DATABASE_URL: postgresql+psycopg://anbar_owner:${POSTGRES_PASSWORD}@db:5432/anbar
+    command: ["sh", "-c", "python -m alembic upgrade head && python -m app.grant_runtime"]
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    build: ../apps/api
+    environment:
+      APP_ENV: production
+      APP_SECRET: ${APP_SECRET:?Required persistent encryption secret}
+      OPERATOR_NAME: ${OPERATOR_NAME:?Required operator identity}
+      PRIVACY_CONTACT: ${PRIVACY_CONTACT:?Required privacy contact}
+      OPERATING_COUNTRY: ${OPERATING_COUNTRY:?Required country}
+      HOSTING_REGION: ${HOSTING_REGION:?Required hosting region}
+      SUBPROCESSORS: ${SUBPROCESSORS:?Required providers disclosure}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      SMTP_HOST: ${SMTP_HOST:?Required SMTP host}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:?Required sender identity}
+      DATABASE_URL: postgresql+psycopg://anbar_app:${RUNTIME_DB_PASSWORD}@db:5432/anbar
+      ALLOWED_HOSTS: ${APP_DOMAIN}
+      PUBLIC_ORIGIN: https://${APP_DOMAIN}
+      CORS_ORIGINS: ""
+      REQUIRE_EMAIL_VERIFICATION: "true"
+      GOOGLE_CREDENTIALS_DIR: /credentials
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--proxy-headers", "--forwarded-allow-ips", "172.30.240.10"]
+    networks:
+      default:
+      proxy:
+        ipv4_address: 172.30.240.11
+    volumes:
+      - ${GOOGLE_CREDENTIALS_DIR:?Required private credentials directory}:/credentials:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  web:
+    build: ../apps/web
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Required actual domain}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+    networks:
+      proxy:
+        ipv4_address: 172.30.240.10
+    restart: unless-stopped
+  backups:
+    build: ../apps/api
+    environment:
+      DATABASE_URL: postgresql+psycopg://anbar_owner:${POSTGRES_PASSWORD}@db:5432/anbar
+      APP_SECRET: ${APP_SECRET:?Required persistent encryption secret}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    command: ["python", "-m", "app.backups", "daemon"]
+    volumes:
+      - encrypted_backups:/backups
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+  encrypted_backups:
+networks:
+  proxy:
+    ipam:
+      config:
+        - subnet: 172.30.240.0/24

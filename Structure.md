@@ -1,179 +1,169 @@
-# دستیار انبار: architecture
+# دستیار انبار: architecture and contracts
 
-## Decision
+Updated 2026-10-12. Implemented MVP, one modular application.
 
-React + TypeScript + Vite for the frontend; Python + FastAPI for the backend;
-PostgreSQL for persistence; SQLAlchemy 2 and Alembic for schema management.
-The foundation uses native CSS semantic tokens and native accessible controls.
+## Stack decision
 
-FastAPI fits a small typed HTTP API and Python file-processing tools. This is a
-maintainability/scope decision, not a benchmark proving that Python always uses
-less memory or scales better than Nest. Nest with Fastify is also viable.
-Use one modular application, synchronous SQLAlchemy sessions, one bounded import
-at a time per workspace initially, and SQL aggregation. Add workers only after
-measuring a real bottleneck. Avoid pandas for small bounded imports.
+React + strict TypeScript + Vite; Python FastAPI; PostgreSQL 17; synchronous
+SQLAlchemy 2; explicit Alembic migrations. Python suits bounded Excel/CSV parsing
+and typed HTTP routes. This is a simplicity/maintainability decision, not a claim
+that Python universally uses less memory or scales better than Nest/Fastify.
+No pandas, queue, Redis, microservices, ORM repository wrappers or external AI.
 
-Runtime: Python 3.12-3.14, Node 24 LTS, PostgreSQL 17. Lock package versions through
-package-lock.json and requirements.lock (runtime), requirements-dev.lock (checks).
-Production uses a single origin with
-`/api` proxied to FastAPI and other routes served from the frontend build.
+Python 3.12-3.14 (Docker/CI 3.13), Node 24. Runtime and check dependencies are
+pinned in requirements.lock/requirements-dev.lock and package-lock.json.
+Frontend state is local React state; the API owns calculations and transactions.
+Production uses one origin: Caddy serves assets and proxies /api to FastAPI.
 
-## Files
+## Source map
 
 ```text
-AGENTS.md                     automatic agent discovery
-Agent.md                      scope and agent behavior
-Structure.md                  architecture and contracts
-Rules.md                      business/design/security/privacy invariants
-Workflow.md                   development and release gates
-README.md                     current capabilities and local commands
-.env.example                  safe configuration examples
-.github/workflows/checks.yml   required build/test checks
-apps/
-  api/
-    pyproject.toml
-    requirements.lock
-    alembic.ini
-    migrations/               reviewed schema changes
-    app/
-      main.py                 health API and security middleware
-      config.py               environment validation
-      domain/inventory.py     pure classification and ranking
-      db/models.py            tenant-scoped persistent schema
-    tests/
-  web/
-    package.json
-    package-lock.json
-    index.html                fa-IR, RTL, viewport
-    vite.config.ts            local /api proxy
-    src/
-      main.tsx
-      App.tsx                 initial shell, privacy and terms routes
-      styles.css              semantic design tokens
-infra/compose.yaml            local PostgreSQL, optional API profile
+AGENTS.md                    discovers the four canonical documents
+Agent.md                     scope, authority, truthful reporting
+Rules.md                     mandatory design/business/security rules
+Structure.md                 this architecture and API contract
+Workflow.md                  run, test, deploy, restore procedures
+README.md                    Persian product/run guide
+LICENSE / THIRD_PARTY.md      ownership and third-party license notices
+LEGAL_SOURCES.md              references for original legal notices
+.env*.example                configuration templates, never real credentials
+.github/workflows/checks.yml  migrations, API tests, web build, audits
+apps/api/
+  app/main.py                lifecycle, health, safe errors, headers
+  app/config.py              validated runtime configuration
+  app/auth.py                registration, login, verification, password lifecycle
+  app/security.py            Argon2id, sessions, CSRF, rate limits, encryption
+  app/body_limit.py          bounded request buffering before multipart parsing
+  app/importing.py           normalization, encrypted previews, atomic apply
+  app/import_routes.py       bounded file routes, mapping, history
+  app/dashboard.py           SQL aggregation, ranking, settings, assistant, export/delete
+  app/sheets.py              private per-workspace service-account reader
+  app/maintenance.py         hourly expiry and audit cleanup
+  app/backups.py             encrypted bounded daily backups and explicit restore
+  app/grant_runtime.py       migration-owner-only runtime table grants
+  app/db/models.py           persistent models and database constraints
+  app/db/session.py          request session/rollback dependency
+  app/domain/inventory.py    pure threshold/ranking contracts
+  migrations/versions/       0001 foundation, 0002 SaaS, 0003 deletion markers
+  tests/                    domain, tenant, authentication, import, restore tests
+apps/web/
+  src/App.tsx               authenticated shell and public legal routes
+  src/Auth.tsx              login/register/verify/reset forms
+  src/Dashboard.tsx         table, filters, counts, replenishment, assistant
+  src/Sources.tsx           file mapping, preview/apply, manual private Sheets
+  src/Settings.tsx          category thresholds and account lifecycle
+  src/Legal.tsx             privacy, terms, cookies and preparation guide
+  src/api.ts / ui.tsx       typed fetch, CSRF memory, accessible common feedback
+  src/styles.css            semantic light/dark RTL design tokens
+  public/theme-init.js      tab appearance only; no authentication storage
+  public/Vazirmatn-OFL.txt   self-hosted font license
+  Caddyfile / Dockerfile    static production build, TLS proxy and CSP
+infra/compose.yaml          complete localhost-only development stack
+infra/compose.production.yaml  private database, migration/runtime separation, TLS, backups
+infra/init-runtime.sh       initial least-privilege runtime database role
 ```
 
-Future modules belong beside existing code when implemented: auth, imports,
-sheets, dashboard, categories. Keep routers thin; validation uses Pydantic;
-business services own transactions and calculations. Do not introduce a repository
-wrapper per table. Frontend feature code consumes `/api/v1` and shared UI tokens.
-Use local React state first. Server state can use a small query cache once needed.
+## Persisted data and isolation
 
-## Database model
-
-Implemented initial schema:
-
-| Entity | Fields / constraints |
+| Table | Purpose and constraints |
 | --- | --- |
-| workspace | UUID id, name, timestamps |
-| category | workspace_id, id, name, low_max, high_min; low_max >= 0 and high_min > low_max |
-| variant | workspace_id, id, category_id, SKU, name, color, size, available >= 0, inventory_updated_at |
-| sale_line | workspace_id, id, variant_id, source, external_order_id, external_line_id, sold_at, quantity, returned_quantity, status |
+| workspaces | UUID, name, revision, detail/aggregate reporting mode and period |
+| accounts | one owner per workspace, unique normalized email, Argon2id hash, verified flag, accepted policy version |
+| categories | unique workspace/name; low_max >= 0, high_min > low_max |
+| variants | unique workspace/SKU, color/size, available >= 0, actual snapshot time, replenishment state |
+| sale_lines | unique workspace/source/order/line; quantity >= returned >= 0, canonical status and dated index |
+| aggregate_sales | one net unit value per workspace/variant, separate reporting snapshot |
+| browser_sessions | SHA-256 of opaque token, account reference, CSRF value, absolute/idle timestamps |
+| action_tokens | hashed single-use verification/reset token, purpose and expiry |
+| rate_buckets | HMAC of action/identity/time bucket, atomic counter, short expiry |
+| import_batches | workspace/version/kind/count/time/expiry; normalized encrypted payload until apply/expiry |
+| import_mappings | only selected field-to-column names, scoped by workspace/kind |
+| sheet_connections | encrypted configuration, last successful applied sync |
+| audit_events | workspace/action/count/time, no imported rows; 90-day retention |
+| deletion_markers | hash of deleted workspace UUID and expiry, retained through backup lifecycle |
 
-SKU uniqueness is `(workspace_id, sku)`. External order-line uniqueness is
-`(workspace_id, source, external_order_id, external_line_id)`. Category and variant
-references use composite workspace foreign keys, preventing cross-shop links.
-Every tenant-owned table includes workspace_id. Deleting a workspace cascades
-through its data; only the future confirmed account-deletion service may invoke it.
+Categories and variants use composite workspace foreign keys. All shop data is
+queried using the authenticated owner's workspace; client-provided workspace IDs
+never select a tenant. Foreign and absent object IDs both return 404. The MVP has
+one owner rather than speculative staff/RBAC features. Workspace deletion cascades
+its operational data, account, sessions, tokens, mappings and connections.
+Deletion markers intentionally have no workspace foreign key.
 
-Before persistent customer endpoints ship, add account, membership (one owner role
-initially), hashed opaque session, import_batch, and sheet_connection migrations.
-Do not activate routes against real data before auth and tenant tests pass.
-Secrets for Sheets are encrypted with a key outside the database and source tree.
+## Inventory and sales rules
 
-## Business rules
+- One SKU is one product/color/size combination; identifiers remain strings.
+- Thresholds are per category, applied to each SKU: low <= low_max, high >= high_min,
+  normal between. Default 3/5: zero and three low, four normal, five high.
+- Rank low-stock, positive net-sales SKUs by units descending, stock ascending,
+  then SKU. Producing SKUs stay visible but are excluded from the proposal queue.
+  Low-stock zero-sale rows require review. A planned state remains a candidate.
+- Count preparing/shipping/completed only; pending/cancelled/refunded excluded.
+  Net units = quantity minus partial returned quantity on the original eligible line.
+- Changing a line's status updates its unique key. Reimport never adds duplicates.
+  Supplied available stock already reflects orders; do not subtract them again.
+- Default sales window is 30 calendar days including today in Asia/Tehran; convert
+  boundaries to UTC and query an exclusive upper bound. Custom windows <=366 days.
+- Aggregate imports replace aggregate rows with their explicit common period;
+  reports never sum them with detailed orders. Importing detail switches the active
+  mode back to detail. Retained detail history may then be used again.
+- Show actual inventory time separately from calculation time. Per-SKU snapshots
+  older than 24 hours have a refresh warning; omitted SKUs may have older snapshots.
 
-- Category thresholds apply separately to every variant, not summed product stock.
-- Low: available <= low_max. High: available >= high_min. Normal: values between.
-- Example shoes: low_max=3, high_min=5. Trousers 2/4 is an editable example.
-- One inventory category per variant, regardless of website merchandising tags.
-- Ranking includes only low-stock variants with positive net sales: descending
-  net units, ascending available units, then SKU for a deterministic tie-break.
-- Low stock with zero sales stays visible as `needs_review`, outside the ranked list.
-- Default window: last 30 calendar days in Asia/Tehran, including today. Convert
-  boundaries to UTC and query `[start, end)`; never guess the source date format.
-- Eligible statuses: preparing, shipping, completed. Source labels map explicitly
-  to these canonical values. Pending, cancelled, and fully refunded are excluded.
-- Net sold per eligible line = quantity - returned_quantity, bounded at zero;
-  returns cannot exceed quantity. Reconcile partial returns using the original line.
-- Updating one order line changes its row; a status transition never inserts a
-  second sale. A sale already deducted in the supplied available inventory must
-  not be deducted again.
+## Import contract
 
-## Import contract (MVP implementation task)
+Inventory: `sku,name,category,color,size,available`.
+Sales: `source,order_id,line_id,sku,sold_at,quantity,status,returned_quantity`.
+Aggregate: `sku,net_units,period_start,period_end`.
 
-Inventory: `sku,name,category,color,size,available`. Sales detail:
-`source,order_id,line_id,sku,sold_at,quantity,status,returned_quantity`.
-Aggregated sales alternative: `sku,net_units,period_start,period_end`; store as a
-separate replaceable reporting snapshot and NEVER add it to detailed orders for
-the same reporting scope. UI must show which mode and period are active.
+Read -> explicitly map -> normalize -> validate -> encrypted preview -> confirmed
+apply. CSV is UTF-8/BOM, comma separated; Excel is XLSX, not XLS. Bounds are 5 MiB,
+10,000 rows, 64 columns, 25 MiB expanded XLSX, <=10 workbook tabs. Reject formulas,
+macros, external links, encrypted archives, traversal and XML entities. Do not
+evaluate formulas. Numeric Excel sizes are accepted; identifiers must be text to
+preserve zeros. Persian/Arabic digits in counts/dates are explicitly normalized.
 
-Keep identifiers as strings. Accept UTF-8/UTF-8-BOM CSV and `.xlsx`, not `.xls`,
-macros, or arbitrary archives. Initial bounds: 5 MiB uploaded, 10,000 rows per
-import, bounded expanded XLSX size of 25 MiB. Reject formulas and encrypted files.
-Headers can be mapped through a saved small per-workspace field mapping.
-Reject duplicate SKU rows in inventory snapshots and duplicate order-line keys in
-one import; return row numbers and field names, not full rows.
+Choose Gregorian ISO or Jalali YYYY-MM-DD/YYYY/MM/DD; timezone is explicit.
+Status mapping is explicit; missing status requires the finalized-report checkbox.
+Reject duplicate inventory SKU/order-line keys, invalid returns and unknown sale
+SKUs. Errors contain row/field/code only. Unselected customer columns are discarded.
 
-Flow: parse -> normalize -> validate -> preview -> explicit apply. Use database
-transactions and a unique batch token for retry protection. Inventory snapshots
-replace the provided SKU quantities, not increment them. Omitted SKUs remain
-unchanged and the preview says so. Unknown sale SKUs block apply. Stale inventory
-snapshots cannot overwrite a newer snapshot silently. Partial imports never commit.
-Raw files are temporary and discarded after processing; durable import batches
-contain counts, mode, period, timestamps, and minimal error metadata.
+Previews expire after 24 hours and capture a workspace revision under a row lock.
+Apply checks revision/expiry/tenant, locks the workspace and commits atomically;
+replaying an applied batch returns success without further writes. Applied payloads
+are erased. Inventory replaces included SKU quantities; missing SKUs are unchanged.
+Older snapshots cannot overwrite newer ones. Limits: 10,000 variants/100,000 detail
+lines per shop. Changing thresholds or replenishment invalidates pending revisions.
 
-Google Sheets uses the same two tables and validation path. Manual sync only.
-For the pilot, an operator-managed service account reads only spreadsheets
-explicitly shared with it; the user supplies spreadsheet ID and tab ranges.
-Prefer one pilot account per shop where practical. No public-sheet requirement.
-No arbitrary URL fetch: call the official Sheets API using a validated ID.
-Credential provisioning is a documented operator prerequisite, not a claim of
-zero-setup OAuth. Self-service OAuth with minimal file access is a later option.
-Google sync must show requested scopes/access, preview data, and allow disconnect.
+Sheets calls the official read-only API with a validated spreadsheet ID and bounded
+ranges. One dedicated service account per shop, private credentials mounted outside
+Git, no arbitrary URLs/public sheets. A sync fetch produces a combined preview;
+inventory and sales apply in one transaction. Connect/disconnect invalidates pending
+Sheets previews. Disconnect stops fetch and removes configuration, while historical
+imported data stays until account deletion. Google sharing revocation is separate.
 
-## Planned API, not current implemented endpoints
+## Implemented routes
 
-```text
-POST   /api/v1/auth/register, /login, /logout
-GET    /api/v1/auth/session
-GET    /api/v1/dashboard?from=...&to=...&category_id=...
-GET    /api/v1/variants?cursor=...&limit=50
-GET    /api/v1/categories
-PATCH  /api/v1/categories/{id}
-POST   /api/v1/imports/preview
-POST   /api/v1/imports/{id}/apply
-GET    /api/v1/export.csv
-POST   /api/v1/sheets/connect, /sync
-DELETE /api/v1/sheets/connection
-DELETE /api/v1/account                 confirmed deletion
-```
+| Method | Route | Behavior |
+| --- | --- | --- |
+| GET | /api/health, /api/ready, /api/meta | data-free health, database readiness, public operator metadata |
+| GET | /api/templates/{inventory,sales,aggregate}.csv | empty BOM templates |
+| GET | /api/v1/auth/session | anonymous/authenticated session and CSRF bootstrap |
+| POST | /api/v1/auth/register, /login, /logout | account/session lifecycle |
+| POST | /api/v1/auth/verify | one-use token, fresh password and policy acceptance |
+| POST | /api/v1/auth/password/{request,reset,change} | generic recovery request, token reset, reauthenticated change |
+| GET | /api/v1/dashboard, /variants | summary or rows; start/end/category, search/state/priority/page filters |
+| GET/PATCH | /api/v1/categories, /categories/{id} | list or threshold update |
+| PATCH | /api/v1/variants/{id}/replenishment | none/planned/producing |
+| POST | /api/v1/imports/headers, /preview | multipart file mapping or validation/preview |
+| POST | /api/v1/imports/{id}/apply | transactional idempotent apply |
+| GET | /api/v1/imports/history | own recent batch metadata |
+| GET | /api/v1/sheets/connection | provisioned account email, own configuration and actual sync time |
+| POST/DELETE | /api/v1/sheets/connect, /sync; /connection | connect/manual preview/disconnect |
+| GET | /api/v1/export.csv, /assistant, /activity | formula-safe report, computed answers, minimal recent events |
+| GET/DELETE | /api/v1/account/export; /account | streamed own JSON export; password+phrase confirmed deletion |
 
-`GET /api/health` is currently implemented. No tenant endpoint is publicly exposed
-by the foundation. Workspace comes from authenticated membership, never trusted
-from a request body or query string. Foreign or missing IDs both return 404.
-Errors use stable codes and field paths. API responses carry generated_at and
-data_updated_at separately; a calculation time is not a synchronization time.
-
-## Deployment boundary
-
-One API process and one database suffice for a pilot; static frontend served by a
-TLS reverse proxy. Database is private. Local compose publishes PostgreSQL only on
-127.0.0.1. The API validates production host settings and disables public API docs.
-The reverse proxy supplies TLS, request-size limits, security headers for static
-assets, and correct SPA fallback for /privacy and /terms. Do not use Vite's dev
-server as a public deployment. Backups, retention, restore rehearsal and monitoring
-are release tasks, not inferred from the presence of compose.yaml.
-
-`apps/api/Dockerfile` provides a non-root Python runtime for machines where native
-Python extensions are unavailable or blocked. Local compose's optional `api`
-profile exposes only the data-free foundation API. It does not provision accounts
-or connect the database automatically.
-
-## Decision sources
-
-- https://fastapi.tiangolo.com/features/
-- https://docs.nestjs.com/techniques/performance
-- https://docs.sqlalchemy.org/en/20/
-- https://alembic.sqlalchemy.org/en/latest/
-- https://developers.google.com/workspace/sheets/api/guides/values
+Unsafe routes require exact Origin and X-CSRF-Token bound to the server session.
+Private reads require authentication; production also requires verified email.
+OpenAPI is available locally and disabled in production. See Workflow.md for
+deployment configuration and release evidence. WooCommerce/CMS/billing/forecasting
+and generative chat remain explicitly later scope.

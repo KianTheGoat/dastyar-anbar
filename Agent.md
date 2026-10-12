@@ -1,6 +1,6 @@
 # دستیار انبار: agent contract
 
-Status: architecture and runnable foundation, not a released SaaS.
+Status: implemented MVP; production activation requires operator configuration.
 Updated: 2026-10-12. Product language: Persian (fa-IR), direction: RTL.
 
 ## Read order and authority
@@ -27,11 +27,12 @@ The core question is: «کدام رنگ و سایز پرفروش را زودتر
 
 ## Current requested delivery
 
-Create the four governing documents, a public GitHub repository, and a minimal
-working React/FastAPI/PostgreSQL foundation. The health API, inventory calculation
-library, first database migration, frontend empty state, and legal notice routes
-are foundation deliverables. Do not describe them as finished account management,
-file import, Google synchronization, or a sellable hosted service.
+Implement the complete agreed MVP with React/FastAPI/PostgreSQL, public GitHub
+source, the four governing documents, authentication, import/export, dashboard,
+private Sheets adapter, category settings, assistant, account lifecycle and honest
+legal notices. The source implements these modules. Hosted production, real email
+delivery and live Google access require domain/provider credentials supplied by
+the operator; synthetic integration tests are not evidence of live connections.
 
 ## MVP boundary
 

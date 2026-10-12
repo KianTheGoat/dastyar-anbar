@@ -106,7 +106,7 @@ managed secret storage. `.env`, uploads, database dumps, exports and logs stay o
 of Git. Validate configuration and fail closed for unsafe production settings.
 No defaults for production passwords or encryption keys.
 
-Before customer endpoints ship:
+Keep these implemented boundaries intact:
 
 - Hash passwords with Argon2id using a maintained library. Allow password managers
   and paste. Add rate limits to login/reset/register; responses avoid enumeration.
@@ -137,8 +137,11 @@ Before customer endpoints ship:
 - Run dependency audits and a staged-secret review before public publication.
   No known exploitable high/critical finding may be waived silently.
 
-The foundation exposes only health and serves a data-free UI. Passing its tests
-does not establish security for future auth, imports or integrations.
+The MVP exposes tenant APIs only after authentication. Production additionally
+requires verified email. Verification establishes a fresh owner password and
+records policy acceptance, preventing takeover of an unverified precreated account.
+Rate counters commit even on rejected authentication. Password reset/change revokes
+all prior sessions. Single-use hashed email tokens expire after 30 minutes.
 
 ## Privacy and cookies
 
@@ -153,21 +156,28 @@ Routes /privacy and /terms are simple readable notices linked in the footer.
 Privacy text must describe actual data, purpose, storage location, subprocessors,
 retention, deletion/export process, contact, cookies and policy changes.
 Do not fabricate operator details or claim GDPR/other legal certification.
-Choose operating jurisdiction and replace the foundation notice with an accurate
-operator-approved notice before collecting personal information.
+The product is «دستیار انبار» within «دستیار»; copyright belongs to its owner.
+Original notices describe this implementation; other sites are references only.
+Production startup requires contact, country, hosting region and provider disclosure.
 
-Current foundation sets no cookies and stores no customer data. Planned session
-cookie is strictly necessary. Explain it in a cookie notice/settings link; do not
+Public legal routes do not bootstrap sessions. Private pages create an anonymous
+30-minute session; authenticated sessions last at most seven days with a 12-hour
+idle expiry. Appearance selected by the user persists only in tab sessionStorage.
+The session cookie is strictly necessary. Explain it in a cookie notice; do not
 show a misleading 'accept all' banner when only necessary cookies exist.
 Optional cookies, if ever introduced, remain off until valid granular consent;
 reject is as easy as accept, withdrawal is available, and consent is versioned.
 Assess actual applicable law; an essential-cookie exemption is jurisdiction-specific.
 
-Pilot retention proposal requiring operator approval: raw imports discarded after
+Implemented retention: raw imports discarded after
 processing; temporary previews expire within 24h; operational rows remain until
 owner deletion; audit metadata 90 days; backups rotate out within 30 days.
-The privacy notice may only state these after implementation and restore/deletion
-checks prove them. Backup deletion is not falsely described as instantaneous.
+Expired previews and minimal audit metadata are cleaned hourly. Daily encrypted
+backups are retained for the configured 1-365 days (default 30). A pseudonymous
+deletion marker survives for backup retention plus one day; restore reapplies
+deletions and revokes all sessions/tokens. Keep the encryption key privately backed
+up; losing it makes previews/connections/backups unreadable. Run grants again after
+restore. Backup deletion is not falsely described as instantaneous.
 Users must be able to export and request/delete their workspace. Google disconnect
 removes stored access and stops sync; revocation does not imply historical deletion.
 
